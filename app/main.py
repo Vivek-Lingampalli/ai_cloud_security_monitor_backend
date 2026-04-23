@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routes import health_routes, scan_routes, anomaly_routes, report_routes
+from app.db.database import init_db
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -32,6 +33,8 @@ app.include_router(report_routes.router, prefix=settings.API_V1_PREFIX, tags=["R
 async def startup_event():
     """Initialize application on startup"""
     print(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    # Initialize database tables
+    init_db()
 
 
 @app.on_event("shutdown")
