@@ -54,3 +54,7 @@ htmlcov/
 
 # Docker
 docker-compose.override.yml
+
+# AWS
+.aws/
+credentials
