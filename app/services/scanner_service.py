@@ -5,8 +5,8 @@ import logging
 import json
 
 from app.scanners.s3_scanner import S3Scanner
+from app.scanners.iam_scanner import IAMScanner
 # from app.scanners.ec2_scanner import EC2Scanner  # To be implemented
-# from app.scanners.iam_scanner import IAMScanner  # To be implemented
 from app.db import models, crud
 from app.db.schemas import FindingCreate, SeverityLevel
 
@@ -32,8 +32,8 @@ class ScannerService:
         
         # Initialize scanners
         self.s3_scanner = S3Scanner(region=self.region)
+        self.iam_scanner = IAMScanner(region=self.region)
         # self.ec2_scanner = EC2Scanner(region=self.region)  # To be implemented
-        # self.iam_scanner = IAMScanner(region=self.region)  # To be implemented
     
     def run_full_scan(self) -> models.Scan:
         """
@@ -62,13 +62,17 @@ class ScannerService:
             resources_scanned += len(buckets)
             logger.info(f"S3 scan completed: {len(s3_findings)} findings from {len(buckets)} buckets")
             
+            # Run IAM scan
+            logger.info("Running IAM scan...")
+            iam_findings = self.iam_scanner.scan()
+            all_findings.extend(iam_findings)
+            users = self.iam_scanner.list_users()
+            resources_scanned += len(users)
+            logger.info(f"IAM scan completed: {len(iam_findings)} findings from {len(users)} users")
+            
             # TODO: Run EC2 scan
             # ec2_findings = self.ec2_scanner.scan()
             # all_findings.extend(ec2_findings)
-            
-            # TODO: Run IAM scan
-            # iam_findings = self.iam_scanner.scan()
-            # all_findings.extend(iam_findings)
             
             # Save findings to database
             logger.info(f"Saving {len(all_findings)} findings to database...")
@@ -146,9 +150,34 @@ class ScannerService:
         Returns:
             Scan model with IAM findings
         """
-        logger.info("IAM scanner not yet implemented")
+        logger.info("Starting IAM security scan...")
+        
+        # Create scan record
         scan = self._create_scan_record("iam")
-        self._fail_scan(scan.id, "IAM scanner not yet implemented")
+        
+        try:
+            # Update scan status
+            self._update_scan_status(scan.id, models.ScanStatus.IN_PROGRESS)
+            
+            # Run IAM scan
+            findings = self.iam_scanner.scan()
+            users = self.iam_scanner.list_users()
+            
+            # Save findings to database
+            logger.info(f"Saving {len(findings)} IAM findings to database...")
+            self._save_findings(scan.id, findings)
+            
+            # Update scan record
+            self._complete_scan(scan.id, len(users), len(findings))
+            
+            logger.info(f"IAM scan completed. Scan ID: {scan.id}")
+            
+        except Exception as e:
+            logger.error(f"Error during IAM scan: {e}")
+            self._fail_scan(scan.id, str(e))
+            raise
+        
+        # Refresh scan object
         self.db.refresh(scan)
         return scan
     

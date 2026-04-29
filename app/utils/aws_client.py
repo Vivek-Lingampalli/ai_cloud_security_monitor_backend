@@ -220,7 +220,7 @@ class AWSClient:
     def list_attached_user_policies(self, user_name: str) -> List[Dict[str, Any]]:
         """Get attached managed policies for an IAM user"""
         if self.mock_mode:
-            return []
+            return self._mock_attached_user_policies(user_name)
         
         try:
             iam = self.get_client('iam')
@@ -244,6 +244,71 @@ class AWSClient:
                 return None
             logger.error(f"Error getting password policy: {e}")
             return None
+    
+    def list_mfa_devices(self, user_name: str) -> List[Dict[str, Any]]:
+        """List MFA devices for an IAM user"""
+        if self.mock_mode:
+            return self._mock_mfa_devices(user_name)
+        
+        try:
+            iam = self.get_client('iam')
+            response = iam.list_mfa_devices(UserName=user_name)
+            return response.get('MFADevices', [])
+        except ClientError as e:
+            logger.error(f"Error listing MFA devices for user {user_name}: {e}")
+            return []
+    
+    def get_policy(self, policy_arn: str) -> Optional[Dict[str, Any]]:
+        """Get IAM policy details"""
+        if self.mock_mode:
+            return self._mock_policy(policy_arn)
+        
+        try:
+            iam = self.get_client('iam')
+            response = iam.get_policy(PolicyArn=policy_arn)
+            return response.get('Policy')
+        except ClientError as e:
+            logger.error(f"Error getting policy {policy_arn}: {e}")
+            return None
+    
+    def get_policy_version(self, policy_arn: str, version_id: str) -> Optional[Dict[str, Any]]:
+        """Get IAM policy version document"""
+        if self.mock_mode:
+            return self._mock_policy_version(policy_arn)
+        
+        try:
+            iam = self.get_client('iam')
+            response = iam.get_policy_version(PolicyArn=policy_arn, VersionId=version_id)
+            return response.get('PolicyVersion')
+        except ClientError as e:
+            logger.error(f"Error getting policy version {policy_arn}:{version_id}: {e}")
+            return None
+    
+    def list_groups_for_user(self, user_name: str) -> List[Dict[str, Any]]:
+        """List groups for an IAM user"""
+        if self.mock_mode:
+            return self._mock_user_groups(user_name)
+        
+        try:
+            iam = self.get_client('iam')
+            response = iam.list_groups_for_user(UserName=user_name)
+            return response.get('Groups', [])
+        except ClientError as e:
+            logger.error(f"Error listing groups for user {user_name}: {e}")
+            return []
+    
+    def list_attached_group_policies(self, group_name: str) -> List[Dict[str, Any]]:
+        """Get attached managed policies for an IAM group"""
+        if self.mock_mode:
+            return []
+        
+        try:
+            iam = self.get_client('iam')
+            response = iam.list_attached_group_policies(GroupName=group_name)
+            return response.get('AttachedPolicies', [])
+        except ClientError as e:
+            logger.error(f"Error getting attached policies for group {group_name}: {e}")
+            return []
     
     # ==================== CloudTrail Helper Functions ====================
     
@@ -369,8 +434,99 @@ class AWSClient:
                 'Arn': 'arn:aws:iam::123456789012:user/developer',
                 'CreateDate': datetime(2023, 6, 15),
                 'PasswordLastUsed': datetime(2024, 4, 22)
+            },
+            {
+                'UserName': 'service-account',
+                'UserId': 'AIDAI23EXAMPLEUSER3',
+                'Arn': 'arn:aws:iam::123456789012:user/service-account',
+                'CreateDate': datetime(2023, 3, 10),
+                'PasswordLastUsed': datetime(2024, 4, 15)
             }
         ]
+    
+    def _mock_mfa_devices(self, user_name: str) -> List[Dict[str, Any]]:
+        """Mock MFA devices - only admin-user has MFA"""
+        from datetime import datetime
+        if user_name == 'admin-user':
+            return [
+                {
+                    'UserName': user_name,
+                    'SerialNumber': f'arn:aws:iam::123456789012:mfa/{user_name}',
+                    'EnableDate': datetime(2023, 1, 5)
+                }
+            ]
+        return []  # Other users don't have MFA
+    
+    def _mock_attached_user_policies(self, user_name: str) -> List[Dict[str, Any]]:
+        """Mock attached user policies - admin-user has admin access, developer has no admin"""
+        if user_name == 'admin-user':
+            return [
+                {
+                    'PolicyName': 'AdministratorAccess',
+                    'PolicyArn': 'arn:aws:iam::aws:policy/AdministratorAccess'
+                }
+            ]
+        elif user_name == 'developer':
+            return [
+                {
+                    'PolicyName': 'ReadOnlyAccess',
+                    'PolicyArn': 'arn:aws:iam::aws:policy/ReadOnlyAccess'
+                }
+            ]
+        return []
+    
+    def _mock_user_groups(self, user_name: str) -> List[Dict[str, Any]]:
+        """Mock user groups"""
+        if user_name == 'admin-user':
+            return [
+                {
+                    'GroupName': 'Administrators',
+                    'GroupId': 'AGPAI23EXAMPLEGROUP1',
+                    'Arn': 'arn:aws:iam::123456789012:group/Administrators'
+                }
+            ]
+        return []
+    
+    def _mock_policy(self, policy_arn: str) -> Dict[str, Any]:
+        """Mock policy details"""
+        return {
+            'PolicyName': 'AdministratorAccess',
+            'PolicyId': 'ANPAI23EXAMPLEPOLICY',
+            'Arn': policy_arn,
+            'DefaultVersionId': 'v1'
+        }
+    
+    def _mock_policy_version(self, policy_arn: str) -> Dict[str, Any]:
+        """Mock policy version document"""
+        import json
+        # Check if this is an admin policy
+        if 'Administrator' in policy_arn or 'admin' in policy_arn.lower():
+            policy_doc = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "*",
+                        "Resource": "*"
+                    }
+                ]
+            }
+        else:
+            policy_doc = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["s3:GetObject", "s3:ListBucket"],
+                        "Resource": "*"
+                    }
+                ]
+            }
+        
+        return {
+            'Document': json.dumps(policy_doc),
+            'IsDefaultVersion': True
+        }
     
     def _mock_password_policy(self) -> Dict[str, Any]:
         """Mock weak password policy"""
