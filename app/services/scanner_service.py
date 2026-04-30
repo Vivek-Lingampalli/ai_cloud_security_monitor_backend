@@ -6,7 +6,7 @@ import json
 
 from app.scanners.s3_scanner import S3Scanner
 from app.scanners.iam_scanner import IAMScanner
-# from app.scanners.ec2_scanner import EC2Scanner  # To be implemented
+from app.scanners.ec2_scanner import EC2Scanner
 from app.db import models, crud
 from app.db.schemas import FindingCreate, SeverityLevel
 
@@ -33,7 +33,7 @@ class ScannerService:
         # Initialize scanners
         self.s3_scanner = S3Scanner(region=self.region)
         self.iam_scanner = IAMScanner(region=self.region)
-        # self.ec2_scanner = EC2Scanner(region=self.region)  # To be implemented
+        self.ec2_scanner = EC2Scanner(region=self.region)
     
     def run_full_scan(self) -> models.Scan:
         """
@@ -70,9 +70,14 @@ class ScannerService:
             resources_scanned += len(users)
             logger.info(f"IAM scan completed: {len(iam_findings)} findings from {len(users)} users")
             
-            # TODO: Run EC2 scan
-            # ec2_findings = self.ec2_scanner.scan()
-            # all_findings.extend(ec2_findings)
+            # Run EC2 scan
+            logger.info("Running EC2 scan...")
+            ec2_findings = self.ec2_scanner.scan()
+            all_findings.extend(ec2_findings)
+            instances = self.ec2_scanner.list_instances()
+            security_groups = self.ec2_scanner.list_security_groups()
+            resources_scanned += len(instances) + len(security_groups)
+            logger.info(f"EC2 scan completed: {len(ec2_findings)} findings from {len(instances)} instances and {len(security_groups)} security groups")
             
             # Save findings to database
             logger.info(f"Saving {len(all_findings)} findings to database...")
@@ -132,9 +137,35 @@ class ScannerService:
     
     def run_ec2_scan(self) -> models.Scan:
         """
-        Run EC2-specific security scan
+        Run EC2-speciStarting EC2 security scan...")
         
-        Returns:
+        # Create scan record
+        scan = self._create_scan_record("ec2")
+        
+        try:
+            # Update scan status
+            self._update_scan_status(scan.id, models.ScanStatus.IN_PROGRESS)
+            
+            # Run EC2 scan
+            findings = self.ec2_scanner.scan()
+            instances = self.ec2_scanner.list_instances()
+            security_groups = self.ec2_scanner.list_security_groups()
+            
+            # Save findings to database
+            logger.info(f"Saving {len(findings)} EC2 findings to database...")
+            self._save_findings(scan.id, findings)
+            
+            # Update scan record
+            self._complete_scan(scan.id, len(instances) + len(security_groups), len(findings))
+            
+            logger.info(f"EC2 scan completed. Scan ID: {scan.id}")
+            
+        except Exception as e:
+            logger.error(f"Error during EC2 scan: {e}")
+            self._fail_scan(scan.id, str(e))
+            raise
+        
+        # Refresh scan object
             Scan model with EC2 findings
         """
         logger.info("EC2 scanner not yet implemented")

@@ -394,23 +394,86 @@ class AWSClient:
         ]
     
     def _mock_security_groups(self) -> List[Dict[str, Any]]:
-        """Mock security groups"""
+        """Mock security groups with various security issues"""
         return [
             {
                 'GroupId': 'sg-12345678',
                 'GroupName': 'web-server-sg',
                 'Description': 'Web server security group',
+                'VpcId': 'vpc-12345678',
                 'IpPermissions': [
                     {
                         'IpProtocol': 'tcp',
                         'FromPort': 22,
                         'ToPort': 22,
-                        'IpRanges': [{'CidrIp': '0.0.0.0/0'}]  # Insecure!
+                        'IpRanges': [{'CidrIp': '0.0.0.0/0', 'Description': 'SSH from anywhere'}]  # CRITICAL!
                     },
                     {
                         'IpProtocol': 'tcp',
                         'FromPort': 80,
                         'ToPort': 80,
+                        'IpRanges': [{'CidrIp': '0.0.0.0/0', 'Description': 'HTTP from anywhere'}]
+                    },
+                    {
+                        'IpProtocol': 'tcp',
+                        'FromPort': 443,
+                        'ToPort': 443,
+                        'IpRanges': [{'CidrIp': '0.0.0.0/0', 'Description': 'HTTPS from anywhere'}]
+                    }
+                ],
+                'IpPermissionsEgress': [
+                    {
+                        'IpProtocol': '-1',
+                        'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
+                    }
+                ]
+            },
+            {
+                'GroupId': 'sg-87654321',
+                'GroupName': 'database-sg',
+                'Description': 'Database security group',
+                'VpcId': 'vpc-12345678',
+                'IpPermissions': [
+                    {
+                        'IpProtocol': 'tcp',
+                        'FromPort': 3306,
+                        'ToPort': 3306,
+                        'IpRanges': [{'CidrIp': '0.0.0.0/0', 'Description': 'MySQL from anywhere'}]  # CRITICAL!
+                    },
+                    {
+                        'IpProtocol': 'tcp',
+                        'FromPort': 3389,
+                        'ToPort': 3389,
+                        'IpRanges': [{'CidrIp': '0.0.0.0/0', 'Description': 'RDP from anywhere'}]  # CRITICAL!
+                    }
+                ],
+                'IpPermissionsEgress': [
+                    {
+                        'IpProtocol': 'tcp',
+                        'FromPort': 443,
+                        'ToPort': 443,
+                        'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
+                    }
+                ]
+            },
+            {
+                'GroupId': 'sg-11111111',
+                'GroupName': 'secure-sg',
+                'Description': 'Properly configured security group',
+                'VpcId': 'vpc-12345678',
+                'IpPermissions': [
+                    {
+                        'IpProtocol': 'tcp',
+                        'FromPort': 443,
+                        'ToPort': 443,
+                        'IpRanges': [{'CidrIp': '10.0.0.0/16', 'Description': 'HTTPS from VPC only'}]
+                    }
+                ],
+                'IpPermissionsEgress': [
+                    {
+                        'IpProtocol': 'tcp',
+                        'FromPort': 443,
+                        'ToPort': 443,
                         'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
                     }
                 ]
