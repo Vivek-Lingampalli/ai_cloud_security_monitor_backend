@@ -137,7 +137,12 @@ class ScannerService:
     
     def run_ec2_scan(self) -> models.Scan:
         """
-        Run EC2-speciStarting EC2 security scan...")
+        Run EC2-specific security scan
+        
+        Returns:
+            Scan model with EC2 findings
+        """
+        logger.info("Starting EC2 security scan...")
         
         # Create scan record
         scan = self._create_scan_record("ec2")
@@ -166,11 +171,6 @@ class ScannerService:
             raise
         
         # Refresh scan object
-            Scan model with EC2 findings
-        """
-        logger.info("EC2 scanner not yet implemented")
-        scan = self._create_scan_record("ec2")
-        self._fail_scan(scan.id, "EC2 scanner not yet implemented")
         self.db.refresh(scan)
         return scan
     
