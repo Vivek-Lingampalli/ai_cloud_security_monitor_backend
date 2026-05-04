@@ -95,6 +95,7 @@ class AnomalyResponse(AnomalyBase):
     event_time: Optional[datetime]
     detected_at: datetime
     created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -133,6 +134,7 @@ class ReportResponse(ReportBase):
     overall_risk_score: float
     scan_id: Optional[int]
     created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -169,6 +171,7 @@ class ScanResponse(ScanBase):
     duration_seconds: Optional[int]
     error_message: Optional[str]
     created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
