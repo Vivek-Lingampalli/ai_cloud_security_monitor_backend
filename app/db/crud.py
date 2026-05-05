@@ -20,12 +20,14 @@ def get_finding(db: Session, finding_id: int) -> Optional[models.Finding]:
     return db.query(models.Finding).filter(models.Finding.id == finding_id).first()
 
 
-def get_findings(db: Session, skip: int = 0, limit: int = 100, severity: Optional[str] = None) -> List[models.Finding]:
+def get_findings(db: Session, skip: int = 0, limit: int = 100, severity: Optional[str] = None, resource_type: Optional[str] = None) -> List[models.Finding]:
     """Get all findings with optional filtering"""
     query = db.query(models.Finding)
     if severity:
         query = query.filter(models.Finding.severity == severity)
-    return query.offset(skip).limit(limit).all()
+    if resource_type:
+        query = query.filter(models.Finding.resource_type == resource_type)
+    return query.order_by(models.Finding.created_at.desc()).offset(skip).limit(limit).all()
 
 
 def update_finding(db: Session, finding_id: int, update_data: dict) -> Optional[models.Finding]:

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routes import health_routes, scan_routes, anomaly_routes, report_routes
+from app.routes import health_routes, scan_routes, anomaly_routes, report_routes, finding_routes
 from app.db.database import init_db
 
 # Initialize FastAPI application
@@ -25,6 +25,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health_routes.router, prefix=settings.API_V1_PREFIX, tags=["Health"])
 app.include_router(scan_routes.router, prefix=settings.API_V1_PREFIX, tags=["Scans"])
+app.include_router(finding_routes.router, prefix=settings.API_V1_PREFIX, tags=["Findings"])
 app.include_router(anomaly_routes.router, prefix=settings.API_V1_PREFIX, tags=["Anomalies"])
 app.include_router(report_routes.router, prefix=settings.API_V1_PREFIX, tags=["Reports"])
 

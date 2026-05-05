@@ -260,3 +260,96 @@ async def get_scan(
     except Exception as e:
         logger.error(f"Error getting scan {scan_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/scans/{scan_id}/findings")
+async def get_scan_findings_filtered(
+    scan_id: int,
+    severity: Optional[str] = Query(None, description="Filter by severity level (critical, high, medium, low, info)"),
+    resource_type: Optional[str] = Query(None, description="Filter by resource type (S3, EC2, IAM, etc.)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get findings for a specific scan with optional filtering
+    
+    Args:
+        scan_id: ID of the scan
+        severity: Optional filter by severity (critical, high, medium, low, info)
+        resource_type: Optional filter by resource type (S3, EC2, IAM, etc.)
+        db: Database session
+        
+    Returns:
+        Filtered findings from the specified scan
+    """
+    try:
+        scanner_service = ScannerService(db)
+        
+        # Get scan to verify it exists
+        scan = scanner_service.get_scan(scan_id)
+        if not scan:
+            raise HTTPException(status_code=404, detail=f"Scan {scan_id} not found")
+        
+        # Get all findings for this scan
+        findings = scanner_service.get_scan_findings(scan_id)
+        
+        # Apply filters
+        filtered_findings = findings
+        if severity:
+            filtered_findings = [f for f in filtered_findings if f.severity.value == severity]
+        if resource_type:
+            filtered_findings = [f for f in filtered_findings if f.resource_type == resource_type]
+        
+        # Format findings for response
+        findings_list = []
+        for finding in filtered_findings:
+            findings_list.append({
+                "id": finding.id,
+                "title": finding.title,
+                "description": finding.description,
+                "severity": finding.severity.value,
+                "resource_type": finding.resource_type,
+                "resource_id": finding.resource_id,
+                "resource_arn": finding.resource_arn,
+                "region": finding.region,
+                "account_id": finding.account_id,
+                "risk_score": finding.risk_score,
+                "status": finding.status,
+                "ai_summary": finding.ai_summary,
+                "remediation_steps": finding.remediation_steps,
+                "created_at": finding.created_at.isoformat() if finding.created_at else None
+            })
+        
+        # Calculate severity breakdown for filtered results
+        severity_breakdown = {
+            'critical': 0,
+            'high': 0,
+            'medium': 0,
+            'low': 0,
+            'info': 0
+        }
+        resource_type_breakdown = {}
+        
+        for finding in filtered_findings:
+            severity_breakdown[finding.severity.value] = severity_breakdown.get(finding.severity.value, 0) + 1
+            resource_type_breakdown[finding.resource_type] = resource_type_breakdown.get(finding.resource_type, 0) + 1
+        
+        return {
+            "success": True,
+            "scan_id": scan_id,
+            "filters": {
+                "severity": severity,
+                "resource_type": resource_type
+            },
+            "summary": {
+                "total_findings": len(findings_list),
+                "severity_breakdown": severity_breakdown,
+                "resource_type_breakdown": resource_type_breakdown
+            },
+            "findings": findings_list
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting filtered findings for scan {scan_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
